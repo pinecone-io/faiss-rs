@@ -1,3 +1,5 @@
+use std::env;
+
 fn main() {
     #[cfg(feature = "static")]
     static_link_faiss();
@@ -7,6 +9,8 @@ fn main() {
 
 #[cfg(feature = "static")]
 fn static_link_faiss() {
+    let target = env::var("TARGET").expect("TARGET not set");
+
     let mut cfg = cmake::Config::new("faiss");
     cfg.define("FAISS_ENABLE_C_API", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
@@ -19,6 +23,9 @@ fn static_link_faiss() {
         .define("FAISS_ENABLE_PYTHON", "OFF")
         .define("BUILD_TESTING", "OFF")
         .very_verbose(true);
+    if target.contains("apple") {
+        cfg.define("OpenMP_ROOT", "/opt/homebrew/opt/libomp");
+    }
     let dst = cfg.build();
     let faiss_location = dst.join("lib");
     let faiss_c_location = dst.join("build/c_api");
@@ -33,7 +40,15 @@ fn static_link_faiss() {
     println!("cargo:rustc-link-lib=static=faiss_c");
     println!("cargo:rustc-link-lib=static=faiss");
     link_cxx();
-    println!("cargo:rustc-link-lib=gomp");
+
+    if !target.contains("msvc") && !target.contains("apple") {
+        println!("cargo:rustc-link-lib=gomp");
+    } else {
+        println!("cargo:rustc-link-lib=omp");
+    }
+    if target.contains("apple") {
+        println!("cargo::rustc-link-search=/opt/homebrew/opt/libomp/lib");
+    }
     println!("cargo:rustc-link-lib=blas");
     println!("cargo:rustc-link-lib=lapack");
     if cfg!(feature = "gpu") {
