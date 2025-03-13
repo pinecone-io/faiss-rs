@@ -1,4 +1,11 @@
+#[cfg(feature = "static")]
 use std::env;
+
+#[cfg(feature = "intel_mkl")]
+extern crate intel_mkl_tool;
+
+#[cfg(feature = "intel_mkl")]
+use intel_mkl_tool::*;
 
 fn main() {
     #[cfg(feature = "static")]
@@ -15,17 +22,35 @@ fn static_link_faiss() {
     cfg.define("FAISS_ENABLE_C_API", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("CMAKE_BUILD_TYPE", "Release")
-        .define("FAISS_ENABLE_GPU", if cfg!(feature = "gpu") {
-            "ON"
-        } else {
-            "OFF"
-        })
+        .define(
+            "FAISS_ENABLE_GPU",
+            if cfg!(feature = "gpu") { "ON" } else { "OFF" },
+        )
         .define("FAISS_ENABLE_PYTHON", "OFF")
         .define("BUILD_TESTING", "OFF")
         .very_verbose(true);
+
     if target.contains("apple") {
         cfg.define("OpenMP_ROOT", "/opt/homebrew/opt/libomp");
     }
+
+    #[cfg(feature = "intel_mkl")]
+    {
+        let mkl_lib = Library::new(Config {
+            link: LinkType::Dynamic,
+            index_size: DataModel::ILP64,
+            parallel: Threading::OpenMP,
+        })
+        .expect("Intel MKL library not found");
+
+        cfg.define("MKL_LIBRARIES", mkl_lib.library_dir.join("libmkl_rt.so"));
+        cfg.define("BLA_VENDOR", "Intel10_64_dyn");
+    }
+
+    if cfg!(feature = "avx512") {
+        cfg.define("FAISS_OPT_LEVEL", "avx512");
+    }
+
     let dst = cfg.build();
     let faiss_location = dst.join("lib");
     let faiss_c_location = dst.join("build/c_api");
@@ -49,8 +74,12 @@ fn static_link_faiss() {
     if target.contains("apple") {
         println!("cargo::rustc-link-search=/opt/homebrew/opt/libomp/lib");
     }
-    println!("cargo:rustc-link-lib=blas");
-    println!("cargo:rustc-link-lib=lapack");
+    if cfg!(feature = "intel_mkl") {
+        println!("cargo:rustc-link-lib=mkl_rt");
+    } else {
+        println!("cargo:rustc-link-lib=blas");
+        println!("cargo:rustc-link-lib=lapack");
+    }
     if cfg!(feature = "gpu") {
         let cuda_path = cuda_lib_path();
         println!("cargo:rustc-link-search=native={}/lib64", cuda_path);
@@ -98,5 +127,7 @@ fn cuda_lib_path() -> String {
         return cuda_include_path;
     }
 
-    panic!("Could not find CUDA: environment variables `CUDA_PATH`, `CUDA_LIB_PATH`, or `CUDA_INCLUDE_PATH` must be set");
+    panic!(
+        "Could not find CUDA: environment variables `CUDA_PATH`, `CUDA_LIB_PATH`, or `CUDA_INCLUDE_PATH` must be set"
+    );
 }

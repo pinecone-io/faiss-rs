@@ -12,10 +12,12 @@ keywords = ["cbir", "clustering", "index", "similarity", "bindings"]
 [features]
 gpu = []
 static = ["cmake"]
-
+intel_mkl = ["intel-mkl-tool"]
+avx512 = []
 
 [build-dependencies]
-cmake = {version = "0.1.50",optional = true}
+cmake = { version = "0.1.50", optional = true }
+intel-mkl-tool = { version = "0.8.1", optional = true }
 
 [badges.maintenance]
 status = "passively-maintained"

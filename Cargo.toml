@@ -13,6 +13,8 @@ edition = "2018"
 [features]
 gpu = ["faiss-sys/gpu"]
 static = ["faiss-sys/static"]
+intel_mkl = ["faiss-sys/intel_mkl"]
+avx512 = ["faiss-sys/avx512"]
 
 [badges.maintenance]
 status = "passively-maintained"
