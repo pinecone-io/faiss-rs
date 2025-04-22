@@ -460,6 +460,8 @@ pub struct IndexImpl {
     inner: *mut FaissIndex,
 }
 
+impl_concurrent_index!(IndexImpl);
+
 unsafe impl Send for IndexImpl {}
 unsafe impl Sync for IndexImpl {}
 
